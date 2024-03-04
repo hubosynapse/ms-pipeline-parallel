@@ -8,7 +8,7 @@ class PipelineMlp(nn.Cell):
     def __init__(self, input_size, hidden_size, output_size, n_layers, pipeline_rank=0, num_pipeline_ranks=2):
         super(PipelineMLP, self).__init__()
         if num_pipeline_ranks > 1:
-            pipeline_rank = mindspore.communication.get_rank()
+            pipeline_rank = ms.communication.get_rank()
         else:
             pipeline_rank = 0
         self.num_pipeline_ranks = num_pipeline_ranks
