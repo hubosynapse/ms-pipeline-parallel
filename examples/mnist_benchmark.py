@@ -6,7 +6,9 @@ We select a computing-bound setup (a MLP with memory size around 40MB)
 import sys
 import time
 import logging
+import numpy as np
 import mindspore as ms
+import mindspore.dataset as ds
 
 from pathlib import Path
 from itertools import cycle
@@ -19,7 +21,7 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
 from src.pipelined_trainer import PipelinedMlpTrainer
-from examples.load_data import MNIST
+from examples.load_data_ms import create_dataset
 
 
 def random_shuffle(images, labels):
@@ -29,7 +31,7 @@ def random_shuffle(images, labels):
     return images[indices, ...], labels[indices, ...]
 
 
-def main(epoch: int=50, batch: int=4096):
+def main(num_epochs: int=1, batch_size: int=32):
     print("Set context")
     ms.set_context(pynative_synchronize=True)
 
@@ -40,6 +42,12 @@ def main(epoch: int=50, batch: int=4096):
     loss_fn = ops.SoftmaxCrossEntropyWithLogits()
     optimizer_cls = nn.Adam
 
+    print("Load dataset")
+    data_path = project_root.joinpath("examples").joinpath("data").joinpath("MNIST")
+    ds_train = create_dataset(str(data_path.joinpath("train")), batch_size=batch_size)
+
+    ds_train_iter = ds_train.create_dict_iterator(num_epochs=num_epochs)
+
     print("Init trainer")
     trainer = PipelinedMlpTrainer(
         input_size=28*28,
@@ -47,25 +55,15 @@ def main(epoch: int=50, batch: int=4096):
         output_size=10,
         n_layers=20,
         optimizer_cls=optimizer_cls, loss_fn=loss_fn, activation=nn.ReLU)
-
-    imgs, labels = MNIST.get_all_train()
-    imgs_test, labels_test = MNIST.get_all_test()
-    imgs_test, labels_test = imgs_test.reshape(imgs_test.shape[0], -1), labels_test.reshape(labels_test.shape[0], -1)
-
-    batch_per_epoch = imgs.shape[0] // batch
-    for e in range(epoch):
-        imgs, labels = random_shuffle(imgs, labels)
-        avg_loss = 0.0
+    
+    for num_iter, row in enumerate(ds_train_iter):
         start = time.time()
-        for b in range(batch_per_epoch):
-            x, y = imgs[b * batch: (b + 1) * batch, ...], labels[b * batch: (b + 1) * batch, ...]
-            trainer.train_with_pipeline(x, y, pipe_state)
-            avg_loss += loss
-            elapsed = time.time() - start
 
-            test_loss, acc = test(imgs_test, labels_test, pipe_state)
-            avg_loss /= batch_per_epoch
-            logging.info(f"Epoch {e} ({batch_per_epoch * batch} images/{elapsed:.4f} sec): Train loss {avg_loss:.4f}, Test loss {test_loss:.4f}, Acc On Test: {acc:.3f}")
+        loss = trainer.train_with_pipeline(row["image"], row["label"])
+        elapsed = time.time() - start
+
+        # test_loss, acc = test(imgs_test, labels_test, pipe_state)
+        logging.info(f"Iteration {num_iter} {elapsed:.4f} sec): Train loss {avg_loss:.4f}")#, Test loss {test_loss:.4f}, Acc On Test: {acc:.3f}")
 
 
 if __name__ == "__main__":

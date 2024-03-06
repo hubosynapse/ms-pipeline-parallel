@@ -42,6 +42,6 @@ class PipelinedMlpTrainer:
             grads0 = self.async_host.backward(self.queue_fvjp0.get())
             avg_loss += loss
 
-        self.w0, self.opt0 = self.async_host.update0(grad_collect0, w0, opt0)
-        self.w1, self.opt1 = self.update1(grad_collect1, w1, opt1)
+        self.async_host.update()
         self.losses.append(avg_loss)
+        return avg_loss

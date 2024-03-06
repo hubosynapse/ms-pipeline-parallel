@@ -19,7 +19,7 @@ class AsyncHost:
             forward_inputs = recv()
 
         # Compute outputs and the vector-Jacobian product function
-        outputs, f_vjp = ms.vjp(self.model, forward_inputs, weights=self.optimizer.parameters())
+        outputs, f_vjp = ms.vjp(self.model, forward_inputs, weights=self.optimizer.parameters)
 
         # Send outputs to the next stage
         if self.model.pipeline_rank < self.model.num_pipeline_ranks - 1:
