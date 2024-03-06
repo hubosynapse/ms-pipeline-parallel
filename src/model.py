@@ -1,12 +1,13 @@
+import mindspore as ms
 from typing import Tuple, List
 from mindspore import Tensor, nn
 from mindspore.ops.operations._inner_ops import Send, Receive
 from mindspore.ops._primitive_cache import _get_cache_prim
 
 
-class PipelineMlp(nn.Cell):
+class PipelinedMlp(nn.Cell):
     def __init__(self, input_size, hidden_size, output_size, n_layers, pipeline_rank=0, num_pipeline_ranks=2):
-        super(PipelineMLP, self).__init__()
+        super().__init__()
         if num_pipeline_ranks > 1:
             pipeline_rank = ms.communication.get_rank()
         else:

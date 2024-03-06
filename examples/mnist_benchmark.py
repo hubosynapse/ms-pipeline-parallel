@@ -10,18 +10,14 @@ from itertools import cycle
 from queue import Queue
 from typing import Iterable
 
-import jax
-from jax.example_libraries.stax import Relu
-import optax
-import pytest
+from mindspore import nn, ops
 
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
-from src.model import mlp
 from src.pipelined_trainer import PipelinedMlpTrainer
 from examples.load_data import MNIST
-from mindspore.nn.loss import SoftmaxCrossEntropyWithLogits
+
 
 
 def random_shuffle(images, labels):
@@ -32,15 +28,15 @@ def random_shuffle(images, labels):
 
 
 def main(epoch: int=50, batch: int=4096):
-    optimizer = optax.adam(learning_rate=0.001)
+    loss_fn = ops.SoftmaxCrossEntropyWithLogits()
+    optimizer_cls = nn.Adam
 
     trainer = PipelinedMlpTrainer(
-        input_shape=(28*28,),
+        input_size=28*28,
         hidden_size=1024,
         output_size=10,
         n_layers=20,
-        optimizer=optimizer, loss_fn=SoftmaxCrossEntropyWithLogits, activation=Relu)
-    pipe_state = init()
+        optimizer_cls=optimizer_cls, loss_fn=loss_fn, activation=nn.ReLU)
 
     imgs, labels = MNIST.get_all_train()
     imgs_test, labels_test = MNIST.get_all_test()

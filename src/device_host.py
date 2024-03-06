@@ -5,12 +5,11 @@ from mindspore.ops._primitive_cache import _get_cache_prim
 world_group = 'nccl_world_group'
 
 class AsyncHost:
-    def __init__(self, model, optimizer_cls, device):
+    def __init__(self, model, optimizer_cls):
         self.model = model
-        self.optimizer = optimizer_cls(self.model.parameters())
-        self.model.set_train(True)
-        self.grads = []
-
+        self.optimizer = optimizer_cls(self.model.trainable_params())
+        self.grads_collection = []
+        
     def forward(self, forward_inputs=None):
         # Receive inputs from the previous stage
         if self.model.pipeline_rank > 0:
@@ -20,7 +19,7 @@ class AsyncHost:
             forward_inputs = recv()
 
         # Compute outputs and the vector-Jacobian product function
-        outputs, f_vjp = ms.vjp(self.model, forward_inputs)
+        outputs, f_vjp = ms.vjp(self.model, forward_inputs, weights=self.optimizer.parameters())
 
         # Send outputs to the next stage
         if self.model.pipeline_rank < self.model.num_pipeline_ranks - 1:
@@ -57,11 +56,18 @@ class AsyncHost:
             send(outputs)
 
 
-    def update(grads_collection, weights, optimizer_state):
-        grads = tree_multimap(lambda x, y: x + y, *grads_collection)
-        updates, optimizer_state = optimizer.update(grads, optimizer_state)
-        weights = optax.apply_updates(updates, weights)
-        return weights, optimizer_state
+    def update(self):
+        # Manually sum gradients from different sources
+        for param in self.optimizer.parameters:
+            # Accumulate gradients from all sources
+            summed_grads = sum(grads[param.name] for grads in self.grads_collection)
+    
+        # Perform optimization step
+        self.optimizer(summed_grads)
+
+        # Zero the gradients after updating
+        self.optimizer.zero_grad()
+
 
     # def update(grads_collection, weights, optimizer_state):
     #     grads = tree_multimap(lambda x, y: x + y, *grads_collection)
