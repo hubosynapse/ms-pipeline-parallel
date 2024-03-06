@@ -1,3 +1,4 @@
+import logging
 import mindspore as ms
 from typing import Tuple, List
 from mindspore import Tensor, nn
@@ -12,6 +13,7 @@ class PipelinedMlp(nn.Cell):
             pipeline_rank = ms.communication.get_rank()
         else:
             pipeline_rank = 0
+        logging.debug(f"Init PipelinedMlp with rank {pipeline_rank}")
         self.num_pipeline_ranks = num_pipeline_ranks
 
         layers = []
