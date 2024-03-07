@@ -58,7 +58,6 @@ def main(num_epochs: int=1, batch_size: int=32):
     
     for num_iter, row in enumerate(ds_train_iter):
         start = time.time()
-
         loss = trainer.train_with_pipeline(row["image"], row["label"])
         elapsed = time.time() - start
 

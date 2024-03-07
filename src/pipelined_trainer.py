@@ -29,11 +29,15 @@ class PipelinedMlpTrainer:
         for fwd in range(2):
             input_part = input_split[fwd]
             target_part = target_split[fwd]
-            f_vjp0 = self.async_host.forward(input_part)
-            predict, f_vjp1 = self.async_host.forward()
-            self.queue_fvjp0.put(f_vjp0)
-            self.queue_fvjp1.put(f_vjp1)
-            self.queue_pred.put((predict, target_split))
+            if self.model.pipeline_rank == 0:
+                f_vjp0 = self.async_host.forward(input_part)
+                self.queue_fvjp0.put(f_vjp0)
+            elif self.model.pipeline_rank == 1:
+                predict, f_vjp1 = self.async_host.forward()
+                self.queue_fvjp1.put(f_vjp1)
+                self.queue_pred.put((predict, target_split))
+            else:
+                raise ValueError("Pipeline rank should be 0 or 1")
 
         avg_loss = 0.0
         for bwd in range(2):
