@@ -1,3 +1,4 @@
+import logging
 import mindspore as ms
 from mindspore.ops.operations._inner_ops import Send, Receive
 from mindspore.ops._primitive_cache import _get_cache_prim
@@ -10,16 +11,25 @@ class AsyncHost:
         self.optimizer = optimizer_cls(self.model.trainable_params())
         self.grads_collection = []
         
-    def forward(self, forward_inputs=None):
+    def forward(self, forward_inputs=None, receive_shape=None):
         # Receive inputs from the previous stage
         if self.model.pipeline_rank > 0:
+            if receive_shape is None:
+                raise ValueError("For stage rank > 0, argument receive_shape is required.")
             recv = _get_cache_prim(Receive)(sr_tag=0,
                                             src_rank=self.model.pipeline_rank - 1,
+                                            shape=receive_shape,
+                                            dtype=ms.float32,
                                             group=world_group)
             forward_inputs = recv()
+        else:
+            if forward_inputs is None:
+                raise ValueError("For stage rank equals 0, argument forward_inputs is required.")
+
 
         # Compute outputs and the vector-Jacobian product function
         outputs, f_vjp = ms.vjp(self.model, forward_inputs, weights=self.optimizer.parameters)
+        logging.debug(outputs.shape)
 
         # Send outputs to the next stage
         if self.model.pipeline_rank < self.model.num_pipeline_ranks - 1:
@@ -30,7 +40,7 @@ class AsyncHost:
 
         # Store f_vjp in the current stage for backward
         # TODO How to make sure that the current vjp is computed from the relevant step
-        return f_vjp
+        return outputs, f_vjp
 
 
     def backward(self, f_vjp, backward_inputs=None):

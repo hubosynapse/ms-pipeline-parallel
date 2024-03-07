@@ -1,3 +1,4 @@
+import logging
 import mindspore as ms
 from queue import Queue
 from mindspore import nn, ops, Tensor
@@ -18,7 +19,8 @@ class PipelinedMlpTrainer:
         self.queue_predict = Queue()
         self.queue_host0_fvjp = Queue()
         self.queue_host1_fvjp = Queue()
-
+        self.queue_receive_shape = Queue()
+        
 
     def train_with_pipeline(self, input, target):
         self.model.set_train(True)
@@ -30,10 +32,15 @@ class PipelinedMlpTrainer:
             input_part = input_split[fwd]
             target_part = target_split[fwd]
             if self.model.pipeline_rank == 0:
-                f_vjp0 = self.async_host.forward(input_part)
+                logging.debug("Stage 0 forward")
+                outputs, f_vjp0 = self.async_host.forward(forward_inputs=input_part)
                 self.queue_fvjp0.put(f_vjp0)
+                self.queue_receive_shape(outputs.shape)
             elif self.model.pipeline_rank == 1:
-                predict, f_vjp1 = self.async_host.forward()
+                logging.debug("Stage 1 forward")
+                receive_shape = self.queue_receive_shape.get()
+                predict, f_vjp1 = self.async_host.forward(receive_shape=receive_shape)
+                logging.debug(predict.shape)
                 self.queue_fvjp1.put(f_vjp1)
                 self.queue_pred.put((predict, target_split))
             else:

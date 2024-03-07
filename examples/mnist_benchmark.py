@@ -32,23 +32,23 @@ def random_shuffle(images, labels):
 
 
 def main(num_epochs: int=1, batch_size: int=32):
-    print("Set context")
+    logging.debug("Set context")
     ms.set_context(pynative_synchronize=True)
 
-    print("Init nccl")
+    logging.debug("Init nccl")
     init("nccl")
 
-    print("Loss and opt")
+    logging.debug("Loss and opt")
     loss_fn = ops.SoftmaxCrossEntropyWithLogits()
     optimizer_cls = nn.Adam
 
-    print("Load dataset")
+    logging.debug("Load dataset")
     data_path = project_root.joinpath("examples").joinpath("data").joinpath("MNIST")
     ds_train = create_dataset(str(data_path.joinpath("train")), batch_size=batch_size)
 
     ds_train_iter = ds_train.create_dict_iterator(num_epochs=num_epochs)
 
-    print("Init trainer")
+    logging.debug("Init trainer")
     trainer = PipelinedMlpTrainer(
         input_size=28*28,
         hidden_size=1024,
