@@ -12,16 +12,20 @@ class AsyncHost:
         self.grads_collection = []
         
     def forward(self, forward_inputs=None, receive_shape=None):
+        logging.debug(f"Forward with rank {self.model.pipeline_rank}")
+
         # Receive inputs from the previous stage
         if self.model.pipeline_rank > 0:
             if receive_shape is None:
                 raise ValueError("For stage rank > 0, argument receive_shape is required.")
+            logging.debug("Receiving...")
             recv = _get_cache_prim(Receive)(sr_tag=0,
                                             src_rank=self.model.pipeline_rank - 1,
                                             shape=receive_shape,
                                             dtype=ms.float32,
                                             group=world_group)
             forward_inputs = recv()
+            logging.debug("Received")
         else:
             if forward_inputs is None:
                 raise ValueError("For stage rank equals 0, argument forward_inputs is required.")
@@ -33,10 +37,13 @@ class AsyncHost:
 
         # Send outputs to the next stage
         if self.model.pipeline_rank < self.model.num_pipeline_ranks - 1:
+            logging.debug("Sending...")
             send = _get_cache_prim(Send)(sr_tag=0,
                                          dest_rank=self.model.pipeline_rank + 1,
                                          group=world_group)
             send(outputs)
+            logging.debug("Sent")
+
 
         # Store f_vjp in the current stage for backward
         # TODO How to make sure that the current vjp is computed from the relevant step
