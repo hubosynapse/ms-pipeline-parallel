@@ -1,5 +1,6 @@
 import logging
 import mindspore as ms
+from mindspore import ops
 from mindspore.ops.operations._inner_ops import Send, Receive
 
 world_group = 'nccl_world_group'
@@ -10,6 +11,7 @@ class AsyncHost:
         self.optimizer = optimizer_cls(self.model.trainable_params())
         self.batch_size = batch_size
         self.grads_collection = []
+        self.depend = ops.Depend()
         
     def forward(self, forward_inputs=None):
         logging.debug(f"Forward with rank {self.model.pipeline_rank}")
@@ -39,7 +41,7 @@ class AsyncHost:
             logging.debug("Sending...")
             send = Send(sr_tag=0,
                         dest_rank=self.model.pipeline_rank + 1,group=world_group)
-            send(outputs)
+            outputs = self.depend(outputs, send(outputs))
             logging.debug("Sent")
 
 
@@ -49,12 +51,20 @@ class AsyncHost:
 
 
     def backward(self, f_vjp, backward_inputs=None):
+        logging.debug(f"Backward with rank {self.model.pipeline_rank}")
+
         if self.model.pipeline_rank < self.model.num_pipeline_ranks:
+            logging.debug("Receiving...")
+            receive_shape = [self.batch_size, self.model.hidden_size]
+
             # Receive backward_inputs from next stage
-            recv = _get_cache_prim(Receive)(sr_tag=0,
-                                            src_rank=self.model.pipeline_rank + 1,
-                                            group=world_group)
+            recv = Receive(sr_tag=0,
+                           src_rank=self.model.pipeline_rank + 1,
+                           shape=receive_shape,
+                           dtype=ms.float32,
+                           group=world_group)
             backward_inputs = recv()
+            logging.debug("Received")
 
         # Compute gradients
         grads_wrt_weights, grads_wrt_foward_inputs = f_vjp(backward_inputs)
@@ -65,40 +75,22 @@ class AsyncHost:
         outputs = grads_wrt_foward_inputs
         if self.model.pipeline_rank > 0:
             # Send gradients to the previous stage
-            send = _get_cache_prim(Send)(sr_tag=0,
-                                         dest_rank=self.model.pipeline_rank - 1,
-                                         group=world_group)
-            send(outputs)
-
+            logging.debug("Sending...")
+            send = Send(sr_tag=0,
+                        dest_rank=self.model.pipeline_rank - 1,group=world_group)
+            outputs = self.depend(outputs, send(outputs))
+            logging.debug("Sent")
+            
 
     def update(self):
-        # Manually sum gradients from different sources
+        logging.debug(f"Update with rank {self.model.pipeline_rank}")
+
+        # Accumulate gradients from all sources
         for param in self.optimizer.parameters:
-            # Accumulate gradients from all sources
             summed_grads = sum(grads[param.name] for grads in self.grads_collection)
     
         # Perform optimization step
         self.optimizer(summed_grads)
 
-        # Zero the gradients after updating
-        self.optimizer.zero_grad()
-
-
-    # def update(grads_collection, weights, optimizer_state):
-    #     grads = tree_multimap(lambda x, y: x + y, *grads_collection)
-    #     updates, optimizer_state = optimizer.update(grads, optimizer_state)
-    #     weights = optax.apply_updates(updates, weights)
-    #     return weights, optimizer_state
-    #     # if self.grads is not None:
-    #     #     for param, grad in zip(self.model.parameters(), self.grads):
-    #     #         if grad is not None:
-    #     #             param.grad = grad.to(self.device)
-    #     #     self.optimizer.step()
-    #     #     self.grads = None  # Reset gradients after update
-    #     if self.pipeline_rank == self.num_pipeline_ranks - 1:
-    #         send = _get_cache_prim(Send)(sr_tag=1, dest_rank=0, group=world_group)
-    #         send(outs)
-    #     elif self.pipeline_rank == 0:
-    #         recv = _get_cache_prim(Receive)(sr_tag=1, src_rank=self.num_pipeline_ranks - 1,
-    #                                         shape=outs.shape, dtype=outs.dtype, group=world_group)
-    #         outs = recv(outs)
+        # Empty the gradients collection after updating
+        self.grads_collection = []

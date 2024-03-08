@@ -31,7 +31,7 @@ def random_shuffle(images, labels):
     return images[indices, ...], labels[indices, ...]
 
 
-def main(num_epochs: int=1, batch_size: int=32):
+def main(num_epochs: int=1, batch_size: int=32, micro_batch_size: int=16):
     logging.debug("Set context")
     ms.set_context(pynative_synchronize=True)
 
@@ -55,6 +55,7 @@ def main(num_epochs: int=1, batch_size: int=32):
         output_size=10,
         n_layers=20,
         batch_size=batch_size,
+        micro_batch_size=micro_batch_size,
         optimizer_cls=optimizer_cls, loss_fn=loss_fn, activation=nn.ReLU)
     
     for num_iter, row in enumerate(ds_train_iter):
