@@ -16,6 +16,10 @@ class PipelinedMlp(nn.Cell):
         logging.debug(f"Init PipelinedMlp with rank {self.pipeline_rank}")
         self.num_pipeline_ranks = num_pipeline_ranks
 
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.n_layers = n_layers
         layers = []
         size = input_size if self.pipeline_rank == 0 else hidden_size
         num_layers_per_rank = n_layers // num_pipeline_ranks

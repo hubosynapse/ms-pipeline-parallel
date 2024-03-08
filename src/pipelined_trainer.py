@@ -8,18 +8,18 @@ from src.device_host import AsyncHost
 
 class PipelinedMlpTrainer:
     def __init__(self, input_size, hidden_size, output_size, n_layers,
+                 batch_size,
                  optimizer_cls, loss_fn, activation):
         self.model = PipelinedMlp(input_size, hidden_size, output_size,
                                  n_layers, num_pipeline_ranks=2)
-        self.async_host = AsyncHost(self.model, optimizer_cls)
+        self.async_host = AsyncHost(self.model, optimizer_cls, batch_size=batch_size)
 
         self.loss_and_grads = ops.value_and_grad(lambda predict, label: loss_fn(predict, label))
         self.losses = []
 
         self.queue_predict = Queue()
-        self.queue_host0_fvjp = Queue()
-        self.queue_host1_fvjp = Queue()
-        self.queue_receive_shape = Queue()
+        self.queue_fvjp0 = Queue()
+        self.queue_fvjp1 = Queue()
         
 
     def train_with_pipeline(self, input, target):
@@ -34,12 +34,10 @@ class PipelinedMlpTrainer:
             if self.model.pipeline_rank == 0:
                 outputs, f_vjp0 = self.async_host.forward(forward_inputs=input_part)
                 self.queue_fvjp0.put(f_vjp0)
-                self.queue_receive_shape(outputs.shape)
             elif self.model.pipeline_rank == 1:
-                receive_shape = self.queue_receive_shape.get()
-                predict, f_vjp1 = self.async_host.forward(receive_shape=receive_shape)
+                predict, f_vjp1 = self.async_host.forward()
                 self.queue_fvjp1.put(f_vjp1)
-                self.queue_pred.put((predict, target_split))
+                self.queue_predict.put((predict, target_split))
             else:
                 raise ValueError("Pipeline rank should be 0 or 1")
 

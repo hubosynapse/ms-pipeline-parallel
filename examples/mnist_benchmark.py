@@ -54,6 +54,7 @@ def main(num_epochs: int=1, batch_size: int=32):
         hidden_size=1024,
         output_size=10,
         n_layers=20,
+        batch_size=batch_size,
         optimizer_cls=optimizer_cls, loss_fn=loss_fn, activation=nn.ReLU)
     
     for num_iter, row in enumerate(ds_train_iter):
