@@ -76,7 +76,7 @@ class AsyncHost:
         self.grads_collection.append(grads_wrt_weights)
 
         outputs = grads_wrt_foward_inputs
-        print(outputs)
+        print([out.shape for out in outputs])
         if self.model.pipeline_rank > 0:
             # Send gradients to the previous stage
             logging.debug("Sending...")
