@@ -13,12 +13,10 @@ def create_dataset(data_path, batch_size=32, num_parallel_workers=1):
     """
     # define dataset
     mnist_ds = ds.MnistDataset(data_path)
-
-    # define map operations
-    type_cast_op = trans.TypeCast(mstype.float32)
     
     # apply map operations on images
-    mnist_ds = mnist_ds.map(input_columns="image", operations=type_cast_op, num_parallel_workers=num_parallel_workers)
+    mnist_ds = mnist_ds.map(input_columns="image", operations=trans.TypeCast(mstype.float32), num_parallel_workers=num_parallel_workers)
+    mnist_ds = mnist_ds.map(input_columns="label", operations=trans.TypeCast(mstype.int32), num_parallel_workers=num_parallel_workers)
 
     # apply DatasetOps
     buffer_size = 10000

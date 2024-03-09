@@ -39,7 +39,7 @@ def main(num_epochs: int=1, batch_size: int=32, micro_batch_size: int=16):
     init("nccl")
 
     logging.debug("Loss and opt")
-    loss_fn = ops.SoftmaxCrossEntropyWithLogits()
+    loss_fn = ops.cross_entropy
     optimizer_cls = nn.Adam
 
     logging.debug("Load dataset")

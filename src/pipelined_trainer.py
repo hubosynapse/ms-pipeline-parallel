@@ -16,7 +16,7 @@ class PipelinedMlpTrainer:
         self.model = PipelinedMlp(input_size, hidden_size, output_size,
                                  n_layers, num_pipeline_ranks=self.NUM_STAGES)
 
-        self.async_host = AsyncHost(self.model, optimizer_cls, batch_size=batch_size)
+        self.async_host = AsyncHost(self.model, optimizer_cls, micro_batch_size=micro_batch_size)
 
         self.loss_and_grads = ops.value_and_grad(lambda predict, label: loss_fn(predict, label))
         self.losses = []
@@ -33,7 +33,6 @@ class PipelinedMlpTrainer:
     def train_with_pipeline(self, input, target):
         self.model.set_train(True)
 
-
         # Split data for pipelining
         input_split = ops.split(input, self.micro_batch_size)
         target_split = ops.split(target, self.micro_batch_size)
@@ -48,18 +47,21 @@ class PipelinedMlpTrainer:
                 self.queue_fvjp0.put(f_vjp0)
             elif self.model.pipeline_rank == 1:
                 predict, f_vjp1 = self.async_host.forward()
+                print(f_vjp1)
                 self.queue_fvjp1.put(f_vjp1)
-                self.queue_predict.put((predict, target_split))
+                self.queue_predict.put((predict, target_part))
             else:
                 raise ValueError("Pipeline rank should be 0 or 1")
 
         avg_loss = 0.0
         for bwd in range(num_splits):
             if self.model.pipeline_rank == 1:
-                loss, grads = self.loss_and_grads(*self.queue_predict.get())
-                grads = self.async_host.backward(self.queue_fvjp1.get())
+                predict, target_part = self.queue_predict.get()
+                loss, lgrads = self.loss_and_grads(predict, target_part)
+                grads = self.async_host.backward(f_vjp=self.queue_fvjp1.get(),
+                                                 backward_inputs=lgrads)
             elif self.model.pipeline_rank == 0:
-                grads = self.async_host.backward(self.queue_fvjp0.get())
+                grads = self.async_host.backward(f_vjp=self.queue_fvjp0.get())
             else:
                 raise ValueError("Pipeline rank should be 0 or 1")
             avg_loss += loss
