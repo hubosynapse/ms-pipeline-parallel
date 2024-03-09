@@ -60,13 +60,14 @@ class PipelinedMlpTrainer:
                 loss, lgrads = self.loss_and_grads(predict, target_part)
                 grads = self.async_host.backward(f_vjp=self.queue_fvjp1.get(),
                                                  backward_inputs=lgrads)
+                avg_loss += loss
             elif self.model.pipeline_rank == 0:
                 grads = self.async_host.backward(f_vjp=self.queue_fvjp0.get())
             else:
                 raise ValueError("Pipeline rank should be 0 or 1")
-            avg_loss += loss
 
-        avg_loss = avg_loss / num_splits
         self.async_host.update()
-        self.losses.append(avg_loss)
+        if self.model.pipeline_rank == 1:
+            avg_loss = avg_loss / num_splits
+            self.losses.append(avg_loss)
         return avg_loss

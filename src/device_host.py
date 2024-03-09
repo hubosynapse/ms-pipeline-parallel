@@ -70,13 +70,13 @@ class AsyncHost:
 
 
         # Compute gradients
-        grads_wrt_weights, grads_wrt_foward_inputs = f_vjp(backward_inputs)
+        grads_wrt_foward_inputs, grads_wrt_weights = f_vjp(backward_inputs)
 
         # Accumulate gradients w.r.t weights
         self.grads_collection.append(grads_wrt_weights)
 
         outputs = grads_wrt_foward_inputs
-        print([out.shape for out in outputs])
+
         if self.model.pipeline_rank > 0:
             # Send gradients to the previous stage
             logging.debug("Sending...")
