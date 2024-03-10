@@ -64,9 +64,10 @@ def main(num_epochs: int=1, batch_size: int=32, micro_batch_size: int=16):
         elapsed = time.time() - start
 
         # test_loss, acc = test(imgs_test, labels_test, pipe_state)
-        logging.info(f"Iteration {num_iter} {elapsed:.4f} sec): Train loss {avg_loss:.4f}")#, Test loss {test_loss:.4f}, Acc On Test: {acc:.3f}")
+        if trainer.model.pipeline_rank == 1:
+            logging.info(f"Iteration {num_iter} {elapsed:.4f} sec): Train loss {loss.asnumpy():.4f}")#, Test loss {test_loss:.4f}, Acc On Test: {acc:.3f}")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     main()

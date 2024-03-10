@@ -90,11 +90,13 @@ class AsyncHost:
         logging.debug(f"Update with rank {self.model.pipeline_rank}")
 
         # Accumulate gradients from all sources
-        for param in self.optimizer.parameters:
-            summed_grads = sum(grads[param.name] for grads in self.grads_collection)
+        summed_grads = []
+        for idx, param in enumerate(self.optimizer.parameters):
+            sg = sum(grads[idx] for grads in self.grads_collection)
+            summed_grads.append(sg)
     
         # Perform optimization step
-        self.optimizer(summed_grads)
+        self.optimizer(tuple(summed_grads))
 
         # Empty the gradients collection after updating
         self.grads_collection = []

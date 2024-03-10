@@ -47,7 +47,6 @@ class PipelinedMlpTrainer:
                 self.queue_fvjp0.put(f_vjp0)
             elif self.model.pipeline_rank == 1:
                 predict, f_vjp1 = self.async_host.forward()
-                print(f_vjp1)
                 self.queue_fvjp1.put(f_vjp1)
                 self.queue_predict.put((predict, target_part))
             else:
