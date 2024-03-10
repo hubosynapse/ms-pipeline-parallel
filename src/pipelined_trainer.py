@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 import mindspore as ms
 from queue import Queue
 from mindspore import nn, ops, Tensor
@@ -9,7 +10,7 @@ from src.device_host import AsyncHost
 class PipelinedMlpTrainer:
     def __init__(self, input_size, hidden_size, output_size, n_layers,
                  batch_size, micro_batch_size,
-                 optimizer_cls, loss_fn, activation):
+                 optimizer_cls, loss_fn):
         self.NUM_STAGES = 2
         self.batch_size = batch_size
         self.micro_batch_size = micro_batch_size

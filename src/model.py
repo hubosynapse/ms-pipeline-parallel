@@ -22,12 +22,12 @@ class PipelinedMlp(nn.Cell):
         self.n_layers = n_layers
         layers = []
         size = input_size if self.pipeline_rank == 0 else hidden_size
-        num_layers_per_rank = n_layers // num_pipeline_ranks
+        num_layers_per_stage = n_layers // num_pipeline_ranks
 
         if self.pipeline_rank == 0:
             layers.append(nn.Flatten())
 
-        for _ in range(num_layers_per_rank):
+        for _ in range(num_layers_per_stage):
             layers.append(nn.Dense(size, hidden_size))
             layers.append(nn.ReLU())
             size = hidden_size

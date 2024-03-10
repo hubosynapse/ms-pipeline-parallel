@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 import mindspore as ms
 from mindspore import ops
 from mindspore.ops.operations._inner_ops import Send, Receive
@@ -8,7 +9,8 @@ world_group = 'nccl_world_group'
 class AsyncHost:
     def __init__(self, model, optimizer_cls, micro_batch_size):
         self.model = model
-        self.optimizer = optimizer_cls(self.model.trainable_params())
+        self.optimizer = optimizer_cls(self.model.trainable_params(),
+                                       learning_rate=0.001)
         self.micro_batch_size = micro_batch_size
         self.grads_collection = []
         self.depend = ops.Depend()
@@ -18,7 +20,6 @@ class AsyncHost:
 
         # Receive inputs from the previous stage
         if self.model.pipeline_rank > 0:
-            logging.debug("Receiving...")
             receive_shape = [self.micro_batch_size, self.model.hidden_size]
             recv = Receive(sr_tag=0,
                            src_rank=self.model.pipeline_rank - 1,
@@ -26,22 +27,17 @@ class AsyncHost:
                            dtype=ms.float32,
                            group=world_group)
             forward_inputs = recv()
-            logging.debug("Received")
         else:
             if forward_inputs is None:
                 raise ValueError("For stage rank equals 0, argument forward_inputs is required.")
 
-
         # Compute outputs and the vector-Jacobian product function
         outputs, f_vjp = ms.vjp(self.model, forward_inputs, weights=self.optimizer.parameters)
-
         # Send outputs to the next stage
         if self.model.pipeline_rank < self.model.num_pipeline_ranks - 1:
-            logging.debug("Sending...")
             send = Send(sr_tag=0,
                         dest_rank=self.model.pipeline_rank + 1,group=world_group)
             outputs = self.depend(outputs, send(outputs))
-            logging.debug("Sent")
 
 
         # Store f_vjp in the current stage for backward
@@ -53,7 +49,6 @@ class AsyncHost:
         logging.debug(f"Backward with rank {self.model.pipeline_rank}")
 
         if self.model.pipeline_rank < self.model.num_pipeline_ranks-1:
-            logging.debug("Receiving...")
             receive_shape = [self.micro_batch_size, self.model.hidden_size]
 
             # Receive backward_inputs from next stage
@@ -63,12 +58,10 @@ class AsyncHost:
                            dtype=ms.float32,
                            group=world_group)
             backward_inputs = recv()
-            logging.debug("Received")
         else:
             if backward_inputs is None:
                 raise ValueError("For the last stage, argument forward_inputs is required.")
-
-
+            
         # Compute gradients
         grads_wrt_foward_inputs, grads_wrt_weights = f_vjp(backward_inputs)
 
@@ -79,11 +72,9 @@ class AsyncHost:
 
         if self.model.pipeline_rank > 0:
             # Send gradients to the previous stage
-            logging.debug("Sending...")
             send = Send(sr_tag=0,
                         dest_rank=self.model.pipeline_rank - 1,group=world_group)
             outputs = self.depend(outputs, send(outputs))
-            logging.debug("Sent")
             
 
     def update(self):
@@ -94,9 +85,13 @@ class AsyncHost:
         for idx, param in enumerate(self.optimizer.parameters):
             sg = sum(grads[idx] for grads in self.grads_collection)
             summed_grads.append(sg)
-    
+
+        # if self.model.pipeline_rank == 0:
+        #     for grads in summed_grads:
+        #         logging.debug(np.max(grads.asnumpy()))
         # Perform optimization step
         self.optimizer(tuple(summed_grads))
-
-        # Empty the gradients collection after updating
+        if self.model.pipeline_rank == 0:
+            logging.debug(np.max(self.model.layers[3].weight.value().asnumpy()))
+        #     print(self.model.layers[19].weight.value())
         self.grads_collection = []
