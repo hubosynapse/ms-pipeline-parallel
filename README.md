@@ -1,4 +1,3 @@
-Example of mindspore pipeline parallelism
 # <center> ms-pipeline-parallel
 
 ### Introduction
@@ -18,14 +17,14 @@ The model to be trained is a multi-layer perceptron. It is further divided into 
 
 
 ### How to run
-Since this is a minimalistic example, it is not packaged as python package. There are a few prerequisites to be met though.
+Before running the demo script, there are a few prerequisites to be fullfilled.
 
 #### Prerequisites
 ##### MindSpore
-To install MindSpore, please refer to the [installation guide](https://www.mindspore.cn/install/en) from MindSpore website. Since this demo only supports GPU version of MindSpore, remember to select GPU CUDA 11.6 during installation.
+To install MindSpore, please refer to the [installation guide](https://www.mindspore.cn/install/en) from MindSpore website. Since this demo only supports GPU version of MindSpore, remember to select `GPU CUDA 11.6` for installation.
 
 ##### Configuration of distributed environment
-In addition, we need to configure the environment for distributed training. The procedure is elaborated in MindSpore [programming guide](https://www.mindspore.cn/docs/programming_guide/en/r1.3/distributed_training_gpu.html). Since this demo requires multi-GPUs within a single host, but not multi-host, we only need to install [OpenMPI-4.0.3](https://www.open-mpi.org/faq/?category=building#easy-build) and [NCCL-2.7.6](https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html#debian) for our environment.
+In addition, we need to configure the environment for distributed training. The procedure is elaborated in MindSpore [programming guide](https://www.mindspore.cn/docs/programming_guide/en/r1.3/distributed_training_gpu.html). Since this demo requires multi-GPUs within a single host, but not multi-host, we only need to install [OpenMPI-4.0.2](https://www.open-mpi.org/faq/?category=building#easy-build) and [NCCL-2.7.6](https://docs.nvidia.com/deeplearning/nccl/install-guide/index.html#debian) for our environment.
 
 #### Run the benchmark example
 After fullfilling the prerequites, we could run the demo now.
@@ -43,14 +42,7 @@ Then we could run the training by
 ```
 
 #### Version Compatibility
-TODO
-
-| MindSpore version | Supported Python version |
-|-------------------|--------------------------|
-| daily build       | >=3.7.5, <=3.9           |
-| >=1.8.1, <=2.0.0  | >=3.7.5, <=3.9           |
-| >=2.1.0           | >=3.8, <=3.9             |
-
+This demo is tested on Python 3.8, MindSpore 2.2.11 (GPU CUDA 11.6), Open MPI 4.0.2
 
 ### License
 
