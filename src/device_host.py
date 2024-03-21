@@ -3,6 +3,7 @@ import numpy as np
 import mindspore as ms
 from mindspore import ops
 from mindspore.ops.operations._inner_ops import Send, Receive
+from mindspore.ops._primitive_cache import _get_cache_prim
 
 world_group = 'nccl_world_group'
 
@@ -21,7 +22,7 @@ class AsyncHost:
         # Receive inputs from the previous stage
         if self.model.pipeline_rank > 0:
             receive_shape = [self.micro_batch_size, self.model.hidden_size]
-            recv = Receive(sr_tag=0,
+            recv = _get_cache_prim(Receive)(sr_tag=0,
                            src_rank=self.model.pipeline_rank - 1,
                            shape=receive_shape,
                            dtype=ms.float32,
@@ -35,7 +36,7 @@ class AsyncHost:
         outputs, f_vjp = ms.vjp(self.model, forward_inputs, weights=self.optimizer.parameters)
         # Send outputs to the next stage
         if self.model.pipeline_rank < self.model.num_pipeline_ranks - 1:
-            send = Send(sr_tag=0,
+            send = _get_cache_prim(Send)(sr_tag=0,
                         dest_rank=self.model.pipeline_rank + 1,group=world_group)
             outputs = self.depend(outputs, send(outputs))
 
@@ -52,7 +53,7 @@ class AsyncHost:
             receive_shape = [self.micro_batch_size, self.model.hidden_size]
 
             # Receive backward_inputs from next stage
-            recv = Receive(sr_tag=0,
+            recv = _get_cache_prim(Receive)(sr_tag=0,
                            src_rank=self.model.pipeline_rank + 1,
                            shape=receive_shape,
                            dtype=ms.float32,
@@ -72,7 +73,7 @@ class AsyncHost:
 
         if self.model.pipeline_rank > 0:
             # Send gradients to the previous stage
-            send = Send(sr_tag=0,
+            send = _get_cache_prim(Send)(sr_tag=0,
                         dest_rank=self.model.pipeline_rank - 1,group=world_group)
             outputs = self.depend(outputs, send(outputs))
             
