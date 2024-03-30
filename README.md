@@ -13,7 +13,7 @@ The layout of this demo is inspired by [pipax](https://github.com/MingRuey/pipax
 
 The model to be trained is a multi-layer perceptron. It is further divided into two stages, which operates on two GPUs. The first GPU processes the forward pass (F) of a micro-batch and then sends the resulting activation data to the second GPU for its forward pass. After completing the forward passes, the process reverses for the backward pass (B), where gradients are calculated and communicated back to the first GPU. Both GPUs accumulate gradients from their respective backward passes, and once all micro-batches are processed, the accumulated gradients are used to update the model's weights.
 
-![Alt text](https://www.deepspeed.ai/assets/images/pipe-schedule.png "Pipeline parallelism schedule")
+![Alt text]("docs/pipeline_paralle.png")
 
 
 ### How to run
@@ -45,5 +45,4 @@ Then we could run the training by
 This demo is tested on Python 3.8, MindSpore 2.2.11 (GPU CUDA 11.6), Open MPI 4.0.2
 
 ### License
-
 This project is released under the [Apache 2.0 license](LICENSE).
